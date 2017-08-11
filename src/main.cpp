@@ -239,9 +239,36 @@ int main() {
           	vector<double> next_y_vals;
 
 
-          	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
+						// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
+
+						// // SET CAR DRIVING IN STRAIGHT LINE
+						// // Setup 50 points for our path planner with points every 0.5m, which works out to 25m/s given the 
+						// // car moves 50 times per second - this is approx. 50mph.
+						// double dist_inc = 0.5;
+						// for(int i = 0; i < 50; i++) {
+						// 	cout << "car_x: " << car_x << " dist inc: " << (dist_inc*i) << " angle: " << car_yaw << " angle component: " << cos(deg2rad(car_yaw)) << endl;
+						// 	next_x_vals.push_back(car_x+(dist_inc*i)*cos(deg2rad(car_yaw)));
+						// 	next_y_vals.push_back(car_y+(dist_inc*i)*sin(deg2rad(car_yaw)));
+						// }
+						// // END STRAIGHT LINE
+
+						// SET CAR DRIVING DOWN THE LANE
+						// Setup 50 points for our path planner with points every 0.5m, which works out to 25m/s given the 
+						// car moves 50 times per second - this is approx. 50mph.
+						double dist_inc = 0.5;
+						for(int i = 0; i < 50; i++) {
+							double next_s = car_s + dist_inc*(i+1);
+							double next_d = 6; // 1.5 lanes from center and each lane is 4m
+							vector<double> xy = getXY(next_s, next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+
+							next_x_vals.push_back(xy[0]);
+							next_y_vals.push_back(xy[1]);
+						}
+						// END DRIVING IN LANE
+
+
           	msgJson["next_x"] = next_x_vals;
-          	msgJson["next_y"] = next_y_vals;
+						msgJson["next_y"] = next_y_vals;
 
           	auto msg = "42[\"control\","+ msgJson.dump()+"]";
 
