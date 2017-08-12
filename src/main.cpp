@@ -243,6 +243,12 @@ int main() {
 					auto sensor_fusion = j[1]["sensor_fusion"];
 
 
+					// The previous path points are important in helping us avoid any discontinuities
+					// in our path with each new time-step. We add our new points to the previous path
+					// points so that we get nice smooth trajectories.
+					// Another method would be to look at JMT (Jerk Minimizing Trajectories) with quintic
+					// polynomials...
+
 					int prev_size = previous_path_x.size();
 
 					if (prev_size > 0) {
@@ -250,37 +256,87 @@ int main() {
 					}
 
 					bool too_close = false;
+					bool left_lane_clear = true;
+					bool right_lane_clear = true;
 
-					// find ref_vel to use - looping over all the cars
+					// Looping over all the cars in the sensor fusion data
 					for (int i=0; i<sensor_fusion.size(); i++) {
 
-						// car is in my lane (sensor_fusion[i] represents the i'th car on the road)
+						// sensor_fusion[i] represents the i'th car on the road
 						float d = sensor_fusion[i][6];
+						double vx = sensor_fusion[i][3];
+						double vy = sensor_fusion[i][4];
+						double check_speed = sqrt(vx*vx + vy*vy);
+						double check_car_s = sensor_fusion[i][5];
+
+						check_car_s += (double)prev_size*0.02*check_speed; //if using previous points can project s value out
+
 						if (d < (2+4*lane+2) && d > (2+4*lane-2)) {
-							double vx = sensor_fusion[i][3];
-							double vy = sensor_fusion[i][4];
-							double check_speed = sqrt(vx*vx + vy*vy);
-							double check_car_s = sensor_fusion[i][5];
+							// car is in ego cars lane
 
-							check_car_s += (double)prev_size*0.02*check_speed; //if using previous points can project s value out
-
-							// check s values greater than mine and gap
+							// Check s value is greater than mine and what the gap is
 							if ((check_car_s > car_s) && ((check_car_s-car_s) < 30)) {
-
-								// Do some logic here, lower reference velocity so we don't crash into the car in front of us,
-								// could also flag to try to change lanes.
-								//ref_vel = 29.5; //mph
 								too_close = true;
-
-								if (lane > 0) {
-									lane = 0;
-								}
 							}
 						}
-					}
+
+						if (too_close) {
+							// FSM goes here to determine behaviour
+							// - Stay in current lane nut slow down
+							// - Change lanes left if clear
+							// - Change lanes right if clear
+
+							// Possible states:
+							// - Keep current lane
+							// - Change lane right
+							// - Change lane left
+							// - Prep lane change right ??
+							// - Prep lane change left ??
+
+							// We will use a cost function here to help determine the best lane to be in...
+
+							// Is the car in a dangerous spot in the left lane?
+							// required gap front / required gap rear
+							int left_lane = lane-1;
+							if (lane > 0 && left_lane_clear && d < (2+4*left_lane+2) && d > (2+4*left_lane-2)) {
+								if (((check_car_s > car_s) && ((check_car_s-car_s) < 30)) || ((check_car_s < car_s) && ((car_s-check_car_s) < 30))) {
+									left_lane_clear = false;
+								}
+							}
+
+							// Is the car in a dangerous spot in the right lane?
+							int right_lane = lane+1;
+							if (lane < 2 && right_lane_clear && d < (2+4*right_lane+2) && d > (2+4*right_lane-2)) {
+								if (((check_car_s > car_s) && ((check_car_s-car_s) < 30)) || ((check_car_s < car_s) && ((car_s-check_car_s) < 30))) {
+									right_lane_clear = false;
+								}
+							}
+						} // too_close
+					} // looping over the cars in sensor fusion
 
 					if (too_close) {
-						ref_vel -= 0.224; // creates a deceleration of approx 5/ms2
+						//std::cout << "Too close!" << std::endl;
+						ref_vel -= 0.224; // creates a deceleration of approx 5/ms2 (converted from m/s to mph)
+
+						if (left_lane_clear) {
+							std::cout << "left lane is clear" << std::endl;
+						} else {
+							std::cout << "left lane is busy" << std::endl;
+						}
+						if (right_lane_clear) {
+							std::cout << "right lane is clear" << std::endl;
+						} else {
+							std::cout << "right lane is busy" << std::endl;
+						}
+
+						if (lane > 0 && left_lane_clear) {
+							std::cout << "CHANGING LEFT" << std::endl;
+							lane -= 1;
+						} else if (lane < 2 && right_lane_clear) {
+							std::cout << "CHANGING RIGHT" << std::endl;
+							lane += 1;
+						}
+
 					} else if (ref_vel < 49.5) {
 						ref_vel += 0.224;
 					}
@@ -323,6 +379,8 @@ int main() {
 					// Create a list of widely spaced (x, y) waypoints, evenly spaced at 30m.
 					// Later we will interpolate these waypoints with a spline and fill it in with more points
 					// that control speed.
+					// By changing the spacing here we can ensure we get a jerk-free trajectory...
+
 					vector<double> ptsx;
 					vector<double> ptsy;
 
@@ -377,6 +435,8 @@ int main() {
 					ptsy.push_back(next_wp2[1]);
 
 					// Shift to car reference frame (move to origin and shift in rotation)
+					// This makes the maths easier, otherwise fitting a polynomial or spline can run
+					// into issues with multiply y-values for the one x-value and so on.
 					for (int i=0; i<ptsx.size(); i++) {
 						double shift_x = ptsx[i] - ref_x;
 						double shift_y = ptsy[i] - ref_y;
