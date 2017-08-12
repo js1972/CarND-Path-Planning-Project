@@ -251,7 +251,7 @@ int main() {
 
 					bool too_close = false;
 
-					// find ref_v to use - looping over all the cars
+					// find ref_vel to use - looping over all the cars
 					for (int i=0; i<sensor_fusion.size(); i++) {
 
 						// car is in my lane (sensor_fusion[i] represents the i'th car on the road)
