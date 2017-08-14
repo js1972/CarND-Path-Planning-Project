@@ -269,37 +269,32 @@ int main() {
 						double check_speed = sqrt(vx*vx + vy*vy);
 						double check_car_s = sensor_fusion[i][5];
 
+						double min_safe_distance_front = 30.0;
+						double min_safe_distance_behind = 40.0;
+
 						check_car_s += (double)prev_size*0.02*check_speed; //if using previous points can project s value out
 
 						if (d < (2+4*lane+2) && d > (2+4*lane-2)) {
 							// car is in ego cars lane
 
 							// Check s value is greater than mine and what the gap is
-							if ((check_car_s > car_s) && ((check_car_s-car_s) < 30)) {
+							if ((check_car_s > car_s) && ((check_car_s-car_s) < min_safe_distance_front)) {
 								too_close = true;
 							}
 						}
 
 						if (too_close) {
-							// FSM goes here to determine behaviour
-							// - Stay in current lane nut slow down
-							// - Change lanes left if clear
-							// - Change lanes right if clear
-
-							// Possible states:
-							// - Keep current lane
-							// - Change lane right
-							// - Change lane left
-							// - Prep lane change right ??
-							// - Prep lane change left ??
-
-							// We will use a cost function here to help determine the best lane to be in...
+							// Behaviour logic
 
 							// Is the car in a dangerous spot in the left lane?
 							// required gap front / required gap rear
 							int left_lane = lane-1;
 							if (lane > 0 && left_lane_clear && d < (2+4*left_lane+2) && d > (2+4*left_lane-2)) {
-								if (((check_car_s > car_s) && ((check_car_s-car_s) < 30)) || ((check_car_s < car_s) && ((car_s-check_car_s) < 30))) {
+								// if ((check_speed > car_speed) && (check_car_s < car_s)) {
+								// 	min_safe_distance_behind = 50;
+								// 	std::cout << "car approaching on left" << std::endl;
+								// }
+								if (((check_car_s > car_s) && ((check_car_s-car_s) < min_safe_distance_front)) || ((check_car_s < car_s) && ((car_s-check_car_s) < min_safe_distance_behind))) {
 									left_lane_clear = false;
 								}
 							}
@@ -307,7 +302,11 @@ int main() {
 							// Is the car in a dangerous spot in the right lane?
 							int right_lane = lane+1;
 							if (lane < 2 && right_lane_clear && d < (2+4*right_lane+2) && d > (2+4*right_lane-2)) {
-								if (((check_car_s > car_s) && ((check_car_s-car_s) < 30)) || ((check_car_s < car_s) && ((car_s-check_car_s) < 30))) {
+								// if ((check_speed > car_speed) && (check_car_s < car_s)) {
+								// 	min_safe_distance_behind = 50;
+								// 	std::cout << "car approaching on right" << std::endl;
+								// }
+								if (((check_car_s > car_s) && ((check_car_s-car_s) < min_safe_distance_front)) || ((check_car_s < car_s) && ((car_s-check_car_s) < min_safe_distance_behind))) {
 									right_lane_clear = false;
 								}
 							}
@@ -318,14 +317,14 @@ int main() {
 						//std::cout << "Too close!" << std::endl;
 						ref_vel -= 0.224; // creates a deceleration of approx 5/ms2 (converted from m/s to mph)
 
-						if (left_lane_clear) {
+						if (lane > 0 && left_lane_clear) {
 							std::cout << "left lane is clear" << std::endl;
-						} else {
+						} else if (lane > 0 && !left_lane_clear) {
 							std::cout << "left lane is busy" << std::endl;
 						}
-						if (right_lane_clear) {
+						if (lane < 2 && right_lane_clear) {
 							std::cout << "right lane is clear" << std::endl;
-						} else {
+						} else if (lane < 2 && !right_lane_clear) {
 							std::cout << "right lane is busy" << std::endl;
 						}
 
